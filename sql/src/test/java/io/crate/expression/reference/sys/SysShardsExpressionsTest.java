@@ -22,6 +22,8 @@
 package io.crate.expression.reference.sys;
 
 import com.google.common.collect.ImmutableMap;
+import io.crate.auth.user.AccessControl;
+import io.crate.auth.user.User;
 import io.crate.expression.NestableInput;
 import io.crate.expression.reference.NestedObjectExpression;
 import io.crate.expression.reference.ReferenceResolver;
@@ -95,6 +97,7 @@ public class SysShardsExpressionsTest extends CrateDummyClusterServiceUnitTest {
         UserDefinedFunctionService udfService = new UserDefinedFunctionService(clusterService, functions);
         schemas = new Schemas(
             Settings.EMPTY,
+            AccessControl.ALLOW_ALL,
             ImmutableMap.of("sys", new SysSchemaInfo()),
             clusterService,
             new DocSchemaInfoFactory(new TestingDocTableInfoFactory(Collections.emptyMap()), (ident, state) -> null , functions, udfService)
@@ -159,7 +162,8 @@ public class SysShardsExpressionsTest extends CrateDummyClusterServiceUnitTest {
     public void testShardInfoLookup() throws Exception {
         Reference info = new Reference(SysShardsTableInfo.ReferenceIdents.ID, RowGranularity.SHARD, IntegerType.INSTANCE,
             ColumnPolicy.STRICT, Reference.IndexType.NOT_ANALYZED, true);
-        assertEquals(info, schemas.getTableInfo(SysShardsTableInfo.IDENT).getReference(SysShardsTableInfo.Columns.ID));
+        assertEquals(info,
+            schemas.getTableInfo(User.CRATE_USER, SysShardsTableInfo.IDENT).getReference(SysShardsTableInfo.Columns.ID));
     }
 
     @Test

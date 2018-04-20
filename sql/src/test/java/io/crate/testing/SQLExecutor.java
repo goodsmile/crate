@@ -44,6 +44,7 @@ import io.crate.analyze.relations.RelationNormalizer;
 import io.crate.analyze.relations.StatementAnalysisContext;
 import io.crate.analyze.repositories.RepositoryParamValidator;
 import io.crate.analyze.repositories.RepositorySettingsModule;
+import io.crate.auth.user.AccessControl;
 import io.crate.auth.user.User;
 import io.crate.data.Row;
 import io.crate.data.RowN;
@@ -213,6 +214,7 @@ public class SQLExecutor {
             );
             Schemas schemas = new Schemas(
                 Settings.EMPTY,
+                AccessControl.ALLOW_ALL,
                 schemaInfoByName,
                 clusterService,
                 new DocSchemaInfoFactory(testingDocTableInfoFactory, testingViewInfoFactory, functions, udfService)
@@ -312,6 +314,7 @@ public class SQLExecutor {
             // schemaInfoByName can receive new items and Schemas creates a new map internally; so mutations are not visible
             Schemas schemas = new Schemas(
                 Settings.EMPTY,
+                AccessControl.ALLOW_ALL,
                 schemaInfoByName,
                 clusterService,
                 new DocSchemaInfoFactory(testingDocTableInfoFactory, testingViewInfoFactory, functions, udfService)
@@ -342,7 +345,7 @@ public class SQLExecutor {
                     tableStats
                 ),
                 relationAnalyzer,
-                new SessionContext(defaultSchema, user, s -> {}),
+                new SessionContext(defaultSchema, user),
                 random
             );
         }

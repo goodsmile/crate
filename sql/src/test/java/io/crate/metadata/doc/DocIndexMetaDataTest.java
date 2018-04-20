@@ -13,6 +13,7 @@ import io.crate.analyze.CreateTableStatementAnalyzer;
 import io.crate.analyze.NumberOfShards;
 import io.crate.analyze.ParamTypeHints;
 import io.crate.analyze.ParameterContext;
+import io.crate.auth.user.AccessControl;
 import io.crate.expression.udf.UserDefinedFunctionService;
 import io.crate.metadata.ColumnIdent;
 import io.crate.metadata.FulltextAnalyzerResolver;
@@ -20,8 +21,8 @@ import io.crate.metadata.Functions;
 import io.crate.metadata.GeneratedReference;
 import io.crate.metadata.IndexReference;
 import io.crate.metadata.Reference;
-import io.crate.metadata.Schemas;
 import io.crate.metadata.RelationName;
+import io.crate.metadata.Schemas;
 import io.crate.metadata.TransactionContext;
 import io.crate.metadata.table.ColumnPolicy;
 import io.crate.metadata.view.ViewInfoFactory;
@@ -949,6 +950,7 @@ public class DocIndexMetaDataTest extends CrateDummyClusterServiceUnitTest {
         CreateTableStatementAnalyzer analyzer = new CreateTableStatementAnalyzer(
             new Schemas(
                 Settings.EMPTY,
+                AccessControl.ALLOW_ALL,
                 ImmutableMap.of("doc", docSchemaInfo),
                 clusterService,
                 new DocSchemaInfoFactory(docTableInfoFactory, viewInfoFactory, functions, udfService)),

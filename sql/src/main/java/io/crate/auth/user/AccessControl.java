@@ -22,12 +22,32 @@
 
 package io.crate.auth.user;
 
-import io.crate.analyze.AnalyzedStatement;
+import io.crate.analyze.user.Privilege;
+import io.crate.metadata.RelationName;
 
-public interface StatementAuthorizedValidator {
+public interface AccessControl {
 
-    /**
-     * Ensures that a user is allowed to execute the statement.
-     */
-    void ensureStatementAuthorized(AnalyzedStatement statement);
+    AccessControl ALLOW_ALL = new AccessControl() {
+
+        @Override
+        public void raiseUnknownIfInvisible(User user, Privilege.Clazz clazz, String ident) {
+
+        }
+
+        @Override
+        public void ensureHasPrivilegesForTable(User user, RelationName relationName) {
+
+        }
+
+        @Override
+        public void ensureHasPrivilegesForView(User user, RelationName relationName) {
+
+        }
+    };
+
+    void raiseUnknownIfInvisible(User user, Privilege.Clazz clazz, String ident);
+
+    void ensureHasPrivilegesForTable(User user, RelationName relationName);
+
+    void ensureHasPrivilegesForView(User user, RelationName relationName);
 }

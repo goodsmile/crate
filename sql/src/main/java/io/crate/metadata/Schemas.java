@@ -26,6 +26,9 @@ import com.carrotsearch.hppc.cursors.ObjectCursor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import io.crate.analyze.user.Privilege;
+import io.crate.auth.user.AccessControl;
+import io.crate.auth.user.User;
 import io.crate.exceptions.RelationUnknown;
 import io.crate.exceptions.SchemaUnknownException;
 import io.crate.expression.udf.UserDefinedFunctionMetaData;
@@ -82,6 +85,7 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
      */
     public static final String DOC_SCHEMA_NAME = "doc";
 
+    private final AccessControl accessControl;
     private final ClusterService clusterService;
     private final DocSchemaInfoFactory docSchemaInfoFactory;
     private final Map<String, SchemaInfo> schemas = new ConcurrentHashMap<>();
@@ -91,10 +95,12 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
 
     @Inject
     public Schemas(Settings settings,
+                   AccessControl accessControl,
                    Map<String, SchemaInfo> builtInSchemas,
                    ClusterService clusterService,
                    DocSchemaInfoFactory docSchemaInfoFactory) {
         super(settings);
+        this.accessControl = accessControl;
         this.clusterService = clusterService;
         this.docSchemaInfoFactory = docSchemaInfoFactory;
         schemas.putAll(builtInSchemas);
@@ -103,15 +109,17 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
     }
 
     @Nullable
-    public TableInfo getTableInfoOrNull(RelationName relationName, Operation operation) {
+    public TableInfo getTableInfoOrNull(User user, RelationName relationName, Operation operation) {
         SchemaInfo schemaInfo = schemas.get(relationName.schema());
         if (schemaInfo == null) {
             return null;
         }
+        accessControl.raiseUnknownIfInvisible(user, Privilege.Clazz.SCHEMA, relationName.schema());
         TableInfo tableInfo = schemaInfo.getTableInfo(relationName.name());
         if (tableInfo == null) {
             return null;
         }
+        accessControl.raiseUnknownIfInvisible(user, Privilege.Clazz.TABLE, tableInfo.ident().toString());
         Operation.blockedRaiseException(tableInfo, operation);
         return tableInfo;
     }
@@ -124,12 +132,13 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
      * @throws RelationUnknown  if table given in <code>ident</code> does
      *                                                    not exist in the given schema
      */
-    public <T extends TableInfo> T getTableInfo(RelationName ident) {
-        SchemaInfo schemaInfo = getSchemaInfo(ident);
+    public <T extends TableInfo> T getTableInfo(User user, RelationName ident) {
+        SchemaInfo schemaInfo = getSchemaInfo(user, ident);
         TableInfo info = schemaInfo.getTableInfo(ident.name());
         if (info == null) {
             throw new RelationUnknown(ident);
         }
+        accessControl.raiseUnknownIfInvisible(user, Privilege.Clazz.TABLE, ident.toString());
         return (T) info;
     }
 
@@ -143,18 +152,19 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
      * @throws RelationUnknown  if table given in <code>ident</code> does
      *                                                    not exist in the given schema
      */
-    public <T extends TableInfo> T getTableInfo(RelationName ident, Operation operation) {
-        TableInfo tableInfo = getTableInfo(ident);
+    public <T extends TableInfo> T getTableInfo(User user, RelationName ident, Operation operation) {
+        TableInfo tableInfo = getTableInfo(user, ident);
         Operation.blockedRaiseException(tableInfo, operation);
         return (T) tableInfo;
     }
 
-    private SchemaInfo getSchemaInfo(RelationName ident) {
+    private SchemaInfo getSchemaInfo(User user, RelationName ident) {
         String schemaName = ident.schema();
         SchemaInfo schemaInfo = schemas.get(schemaName);
         if (schemaInfo == null) {
             throw new SchemaUnknownException(schemaName);
         }
+        accessControl.raiseUnknownIfInvisible(user, Privilege.Clazz.SCHEMA, schemaInfo.name());
         return schemaInfo;
     }
 
@@ -259,7 +269,8 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
         return true;
     }
 
-    public boolean tableExists(RelationName relationName) {
+    public boolean tableExists(User user, RelationName relationName) {
+        accessControl.ensureHasPrivilegesForTable(user, relationName);
         SchemaInfo schemaInfo = schemas.get(relationName.schema());
         if (schemaInfo == null) {
             return false;
@@ -310,7 +321,7 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
      * @throws SchemaUnknownException if the view was not found and no such schema exists
      */
     @Nullable
-    public ViewMetaData resolveView(RelationName relationName) {
+    public ViewMetaData resolveView(User user, RelationName relationName) {
         ViewsMetaData views = clusterService.state().metaData().custom(ViewsMetaData.TYPE);
         ViewMetaData view = views == null ? null : views.getView(relationName);
         if (view == null) {
@@ -319,13 +330,15 @@ public class Schemas extends AbstractLifecycleComponent implements Iterable<Sche
             }
             return null;
         }
+        accessControl.raiseUnknownIfInvisible(user, Privilege.Clazz.VIEW, relationName.toString());
         return view;
     }
 
     /**
      * Performs a lookup to see if a view with the relationName exists.
      */
-    public boolean viewExists(RelationName relationName) {
+    public boolean viewExists(User user, RelationName relationName) {
+        accessControl.ensureHasPrivilegesForView(user, relationName);
         ViewsMetaData views = clusterService.state().metaData().custom(ViewsMetaData.TYPE);
         return views != null && views.getView(relationName) != null;
     }

@@ -22,6 +22,8 @@ import io.crate.auth.AlwaysOKAuthentication;
 import io.crate.auth.AuthSettings;
 import io.crate.auth.Authentication;
 import io.crate.auth.HostBasedAuthentication;
+import io.crate.auth.user.AccessControl;
+import io.crate.auth.user.PrivilegeAccessControl;
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.common.settings.Settings;
 
@@ -41,5 +43,6 @@ public class AuthenticationModule extends AbstractModule {
             bind(Authentication.class).to(AlwaysOKAuthentication.class);
         }
         bind(AuthenticationHttpAuthHandlerRegistry.class).asEagerSingleton();
+        bind(AccessControl.class).to(PrivilegeAccessControl.class);
     }
 }

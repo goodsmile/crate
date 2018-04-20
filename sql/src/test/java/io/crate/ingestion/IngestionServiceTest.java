@@ -22,6 +22,7 @@
 
 package io.crate.ingestion;
 
+import io.crate.auth.user.User;
 import io.crate.metadata.RelationName;
 import io.crate.metadata.Schemas;
 import io.crate.metadata.cluster.DDLClusterStateService;
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -95,7 +97,7 @@ public class IngestionServiceTest extends CrateDummyClusterServiceUnitTest {
 
     @Test
     public void testOnClusterStateChangeRulesAreRevalidatedAndPushedToListener() {
-        when(schemas.tableExists(any())).thenAnswer(invocationOnMock -> {
+        when(schemas.tableExists(eq(User.CRATE_USER), any())).thenAnswer(invocationOnMock -> {
             RelationName relationName = (RelationName) invocationOnMock.getArguments()[0];
             // simulate target table was dropped
             if (relationName.fqn().equals(UNDER_TEST_RULE_TARGET_TABLE)) {
