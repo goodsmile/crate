@@ -138,7 +138,7 @@ class BulkPortal extends AbstractPortal {
     }
 
     @Override
-    public CompletableFuture<?> sync(Planner planner, JobsLogs jobsLogs) {
+    public CompletableFuture<Boolean> sync(Planner planner, JobsLogs jobsLogs) {
         List<Row> bulkParams = Rows.of(bulkArgs);
         TransactionContext transactionContext = new TransactionContext(sessionContext);
 
@@ -172,7 +172,7 @@ class BulkPortal extends AbstractPortal {
         return executeBulk(portalContext.getExecutor(), plan, plannerContext, jobId, jobsLogs, bulkParams);
     }
 
-    private CompletableFuture<Void> executeBulk(DependencyCarrier executor,
+    private CompletableFuture<Boolean> executeBulk(DependencyCarrier executor,
                                                 Plan plan,
                                                 PlannerContext plannerContext,
                                                 final UUID jobId,
@@ -197,7 +197,8 @@ class BulkPortal extends AbstractPortal {
         return allFutures
             .exceptionally(t -> null) // swallow exception - failures are set per item in emitResults
             .thenAccept(ignored -> emitResults(jobId, jobsLogs, rowCounts))
-            .runAfterBoth(allResultReceivers, NO_OP_ACTION);
+            .runAfterBoth(allResultReceivers, NO_OP_ACTION)
+            .thenApply(ignored -> null);
     }
 
     private void emitResults(UUID jobId, JobsLogs jobsLogs, List<CompletableFuture<Long>> completedResultFutures) {

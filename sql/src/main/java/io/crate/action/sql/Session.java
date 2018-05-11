@@ -391,7 +391,7 @@ public class Session implements AutoCloseable {
         }
     }
 
-    public CompletableFuture<?> sync() {
+    public CompletableFuture<Boolean> sync() {
         switch (pendingExecutions.size()) {
             case 0:
                 LOGGER.debug("method=sync pendingExecutions=0");

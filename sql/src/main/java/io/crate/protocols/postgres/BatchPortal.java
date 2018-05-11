@@ -146,7 +146,7 @@ class BatchPortal extends AbstractPortal {
     }
 
     @Override
-    public CompletableFuture<Void> sync(Planner planner, JobsLogs jobsLogs) {
+    public CompletableFuture<Boolean> sync(Planner planner, JobsLogs jobsLogs) {
         CountdownFutureCallback completionCallback = new CountdownFutureCallback(analyzedStatements.size());
         for (int i = 0; i < analyzedStatements.size(); i++) {
             UUID jobId = UUID.randomUUID();
@@ -186,7 +186,7 @@ class BatchPortal extends AbstractPortal {
             );
         }
         synced = true;
-        return completionCallback;
+        return completionCallback.thenApply(ignored -> null);
     }
 
     private Row getArgs() {

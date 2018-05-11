@@ -34,6 +34,9 @@ import javax.annotation.Nullable;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * A portal is the entry point for submitting queries to the cluster.
+ */
 public interface Portal {
 
     FormatCodes.FormatCode[] getLastResultFormatCodes();
@@ -59,7 +62,10 @@ public interface Portal {
 
     void execute(ResultReceiver resultReceiver, int maxRows);
 
-    CompletableFuture<?> sync(Planner planner, JobsLogs jobsLogs);
+    /**
+     * @return True if interrupted, false or null otherwise.
+     */
+    CompletableFuture<Boolean> sync(Planner planner, JobsLogs jobsLogs);
 
     void close();
 

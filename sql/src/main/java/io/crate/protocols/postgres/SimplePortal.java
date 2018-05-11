@@ -174,7 +174,7 @@ public class SimplePortal extends AbstractPortal {
     }
 
     @Override
-    public CompletableFuture<?> sync(Planner planner, JobsLogs jobsLogs) {
+    public CompletableFuture<Boolean> sync(Planner planner, JobsLogs jobsLogs) {
         assert analyzedStatement != null : "analyzedStatement must not be null";
         UUID jobId = UUID.randomUUID();
         RoutingProvider routingProvider = new RoutingProvider(Randomness.get().nextInt(), planner.getAwarenessAttributes());
