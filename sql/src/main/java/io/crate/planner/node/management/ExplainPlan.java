@@ -22,11 +22,12 @@
 
 package io.crate.planner.node.management;
 
-import io.crate.expression.symbol.SelectSymbol;
+import com.google.common.collect.ImmutableMap;
 import io.crate.data.InMemoryBatchIterator;
 import io.crate.data.Row;
 import io.crate.data.Row1;
 import io.crate.data.RowConsumer;
+import io.crate.expression.symbol.SelectSymbol;
 import io.crate.planner.DependencyCarrier;
 import io.crate.planner.ExecutionPlan;
 import io.crate.planner.Plan;
@@ -43,9 +44,11 @@ import static io.crate.data.SentinelRow.SENTINEL;
 public class ExplainPlan implements Plan {
 
     private final Plan subPlan;
+    private final boolean analyze;
 
-    public ExplainPlan(Plan subExecutionPlan) {
+    public ExplainPlan(Plan subExecutionPlan, boolean analyze) {
         this.subPlan = subExecutionPlan;
+        this.analyze = analyze;
     }
 
     public Plan subPlan() {
@@ -59,6 +62,7 @@ public class ExplainPlan implements Plan {
                         Row params,
                         Map<SelectSymbol, Object> valuesBySubQuery) {
         Map<String, Object> map;
+
         try {
             if (subPlan instanceof LogicalPlan) {
                 map = ExplainLogicalPlan.explainMap((LogicalPlan) subPlan, plannerContext, executor.projectionBuilder());
@@ -76,6 +80,14 @@ public class ExplainPlan implements Plan {
         } catch (Throwable t) {
             consumer.accept(null, t);
             return;
+        }
+        if (analyze) {
+            long before = System.nanoTime();
+            subPlan.execute(executor, plannerContext, consumer, params, valuesBySubQuery);
+            long executionTime = System.nanoTime() - before;
+
+            map = ImmutableMap.<String, Object>builder().putAll(map).put("Execution Time",
+                executionTime / 1000000).build();
         }
         consumer.accept(InMemoryBatchIterator.of(new Row1(map), SENTINEL), null);
     }
