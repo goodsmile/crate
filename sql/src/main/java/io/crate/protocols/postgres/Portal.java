@@ -36,6 +36,9 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * A portal is the entry point for submitting queries to the cluster.
+ *
+ * It models the portal objects of the PostgreSQL Wire Protocol:
+ * https://www.postgresql.org/docs/current/static/protocol-flow.html
  */
 public interface Portal {
 
