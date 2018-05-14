@@ -143,7 +143,11 @@ public final class SqlFormatter {
         @Override
         protected Void visitExplain(Explain node, Integer indent) {
             append(indent, "EXPLAIN ");
-            process(node.getStatement(), indent);
+            if (node.isAnalyze()) {
+                builder.append("ANALYZE ");
+            }
+            builder.append("\n");
+            process(node.getStatement(), indent + 1);
             return null;
         }
 
@@ -158,21 +162,22 @@ public final class SqlFormatter {
             process(node.getQueryBody(), indent);
 
             if (!node.getOrderBy().isEmpty()) {
+                builder.append("\n");
                 append(indent,
                     "ORDER BY " + node.getOrderBy().stream()
                         .map(orderByFormatterFunction)
                         .collect(COMMA_JOINER)
-                ).append('\n');
+                );
             }
 
             if (node.getLimit().isPresent()) {
-                append(indent, "LIMIT " + node.getLimit().get())
-                    .append('\n');
+                builder.append("\n");
+                append(indent, "LIMIT " + node.getLimit().get());
             }
 
             if (node.getOffset().isPresent()) {
-                append(indent, "OFFSET " + node.getOffset().get())
-                    .append('\n');
+                builder.append("\n");
+                append(indent, "OFFSET " + node.getOffset().get());
             }
 
             return null;
@@ -183,6 +188,7 @@ public final class SqlFormatter {
             process(node.getSelect(), indent);
 
             if (!node.getFrom().isEmpty()) {
+                builder.append('\n');
                 append(indent, "FROM");
                 if (node.getFrom().size() > 1) {
                     builder.append('\n');
@@ -201,42 +207,41 @@ public final class SqlFormatter {
                 }
             }
 
-            builder.append('\n');
-
             if (node.getWhere().isPresent()) {
-                append(indent, "WHERE " + formatStandaloneExpression(node.getWhere().get()))
-                    .append('\n');
+                builder.append('\n');
+                append(indent, "WHERE " + formatStandaloneExpression(node.getWhere().get()));
             }
 
             if (!node.getGroupBy().isEmpty()) {
+                builder.append('\n');
                 append(indent,
                     "GROUP BY " + node.getGroupBy().stream()
                         .map(ExpressionFormatter::formatStandaloneExpression)
-                        .collect(COMMA_JOINER))
-                    .append('\n');
+                        .collect(COMMA_JOINER));
             }
 
             if (node.getHaving().isPresent()) {
-                append(indent, "HAVING " + formatStandaloneExpression(node.getHaving().get()))
-                    .append('\n');
+                builder.append('\n');
+                append(indent, "HAVING " + formatStandaloneExpression(node.getHaving().get()));
             }
 
             if (!node.getOrderBy().isEmpty()) {
+                builder.append('\n');
                 append(indent,
                     "ORDER BY " + node.getOrderBy().stream()
                         .map(orderByFormatterFunction)
                         .collect(COMMA_JOINER)
-                ).append('\n');
+                );
             }
 
             if (node.getLimit().isPresent()) {
-                append(indent, "LIMIT " + node.getLimit().get())
-                    .append('\n');
+                builder.append('\n');
+                append(indent, "LIMIT " + node.getLimit().get());
             }
 
             if (node.getOffset().isPresent()) {
-                append(indent, "OFFSET " + node.getOffset().get())
-                    .append('\n');
+                builder.append('\n');
+                append(indent, "OFFSET " + node.getOffset().get());
             }
             return null;
         }
@@ -263,7 +268,6 @@ public final class SqlFormatter {
                 process(Iterables.getOnlyElement(node.getSelectItems()), indent);
             }
 
-            builder.append('\n');
             return null;
         }
 
