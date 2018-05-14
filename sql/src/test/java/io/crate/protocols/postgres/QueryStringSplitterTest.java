@@ -49,15 +49,33 @@ public class QueryStringSplitterTest {
     @Test
     public void testSingleQuoteEscaping() {
         assertThat(QueryStringSplitter.splitQuery("select 'Hello ''Joe''';select 2"),
-            contains("select 'Hello ''Joe''';",
-                "select 2"));
+            contains("select 'Hello ''Joe''';", "select 2"));
+        assertThat(QueryStringSplitter.splitQuery("select 'Hello Semicolon;';select 2"),
+            contains("select 'Hello Semicolon;';", "select 2"));
+        assertThat(QueryStringSplitter.splitQuery("select 'Hello comment -- test;';select 2"),
+            contains("select 'Hello comment -- test;';", "select 2"));
+        assertThat(QueryStringSplitter.splitQuery("select 'Hello comment /* bla */;';select 2"),
+            contains("select 'Hello comment /* bla */;';", "select 2"));
     }
 
     @Test
     public void testDoubleQuoteEscaping() {
         assertThat(QueryStringSplitter.splitQuery("select \"USER\";select \"crazy'Column\""),
-            contains("select \"USER\";",
+            contains(
+                "select \"USER\";",
                 "select \"crazy'Column\""));
+        assertThat(QueryStringSplitter.splitQuery("select \"SemiColon;\";select \"crazy'Column\""),
+            contains(
+                "select \"SemiColon;\";",
+                "select \"crazy'Column\""));
+        assertThat(QueryStringSplitter.splitQuery("select \"Hello comment -- test;\";select 2"),
+            contains(
+                "select \"Hello comment -- test;\";",
+                "select 2"));
+        assertThat(QueryStringSplitter.splitQuery("select \"Hello comment /* bla */;\"; select 2"),
+            contains(
+                "select \"Hello comment /* bla */;\";",
+                " select 2"));
     }
 
     @Test

@@ -28,6 +28,9 @@ import java.util.List;
 import static io.crate.protocols.postgres.QueryStringSplitter.CommentType.LINE;
 import static io.crate.protocols.postgres.QueryStringSplitter.CommentType.MULTI_LINE;
 import static io.crate.protocols.postgres.QueryStringSplitter.CommentType.NO;
+import static io.crate.protocols.postgres.QueryStringSplitter.QuoteType.NONE;
+import static io.crate.protocols.postgres.QueryStringSplitter.QuoteType.SINGLE;
+import static io.crate.protocols.postgres.QueryStringSplitter.QuoteType.DOUBLE;
 
 /**
  * Splits a query string by semicolon into multiple statements.
@@ -50,7 +53,7 @@ class QueryStringSplitter {
         final List<String> queries = new ArrayList<>(2);
 
         CommentType commentType = NO;
-        QuoteType quoteType = QuoteType.NONE;
+        QuoteType quoteType = NONE;
 
         char[] chars = query.toCharArray();
 
@@ -63,24 +66,24 @@ class QueryStringSplitter {
                     if (commentType == NO) {
                         if (lastChar == '\'') {
                             // quoting of ' via ''
-                            quoteType = QuoteType.NONE;
+                            quoteType = NONE;
                         } else {
-                            quoteType = QuoteType.SINGLE;
+                            quoteType = quoteType == SINGLE ? NONE : SINGLE;
                         }
                     }
                     break;
                 case '"':
-                    if (commentType == NO && quoteType == QuoteType.NONE) {
-                        quoteType = QuoteType.DOUBLE;
+                    if (commentType == NO) {
+                        quoteType = quoteType == DOUBLE ? NONE : DOUBLE;
                     }
                     break;
                 case '-':
-                    if (commentType == NO && lastChar == '-') {
+                    if (commentType == NO && quoteType == NONE && lastChar == '-') {
                         commentType = LINE;
                     }
                     break;
                 case '*':
-                    if (commentType == NO && lastChar == '/') {
+                    if (commentType == NO && quoteType == NONE && lastChar == '/') {
                         commentType = MULTI_LINE;
                     }
                     break;
@@ -97,7 +100,7 @@ class QueryStringSplitter {
                     }
                     break;
                 case ';':
-                    if (commentType == NO) {
+                    if (commentType == NO && quoteType == NONE) {
                         queries.add(new String(chars, offset, i - offset + 1));
                         offset = i + 1;
                     }
