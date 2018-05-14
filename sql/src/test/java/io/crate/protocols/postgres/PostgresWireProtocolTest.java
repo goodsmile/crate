@@ -396,20 +396,38 @@ public class PostgresWireProtocolTest extends CrateDummyClusterServiceUnitTest {
 
     @Test
     public void testHandleMultipleSimpleQueries() {
+        submitQueriesThroughSimpleQueryMode(false);
+        readReadyForQueryMessage(channel);
+        assertThat(channel.outboundMessages().size() , is(0));
+    }
+
+    @Test
+    public void testHandleMultipleSimpleQueriesWithQueryFailure() {
+        submitQueriesThroughSimpleQueryMode(true);
+        readErrorResponse(channel);
+        readReadyForQueryMessage(channel);
+        assertThat(channel.outboundMessages().size() , is(0));
+    }
+
+    private void submitQueriesThroughSimpleQueryMode(boolean failFirstStatement) {
         SQLOperations sqlOperations = Mockito.mock(SQLOperations.class);
         Session session = mock(Session.class);
         when(sqlOperations.createSession(any(String.class), any(User.class))).thenReturn(session);
         Session.DescribeResult describeResult = mock(Session.DescribeResult.class);
         when(describeResult.getFields()).thenReturn(null);
         when(session.describe(anyChar(), anyString())).thenReturn(describeResult);
-        when(session.sync()).thenReturn(CompletableFuture.completedFuture(false));
+        if (failFirstStatement) {
+            when(session.sync()).thenAnswer(mock -> new RuntimeException("fail"));
+        } else {
+            when(session.sync()).thenReturn(CompletableFuture.completedFuture(false));
+        }
 
         PostgresWireProtocol ctx =
             new PostgresWireProtocol(
                 sqlOperations,
                 new AlwaysOKNullAuthentication(),
                 null);
-        EmbeddedChannel channel = new EmbeddedChannel(ctx.decoder, ctx.handler);
+        channel = new EmbeddedChannel(ctx.decoder, ctx.handler);
 
         sendStartupMessage(channel);
         readAuthenticationOK(channel);
@@ -418,14 +436,12 @@ public class PostgresWireProtocolTest extends CrateDummyClusterServiceUnitTest {
 
         ByteBuf query = Unpooled.buffer();
         try {
-            Messages.writeCString(query, "set search_path to 'hoschi';select 42;".getBytes(StandardCharsets.UTF_8));
+            // the actual statements don't have to be valid as they are not executed
+            Messages.writeCString(query, "first statement; second statement;".getBytes(StandardCharsets.UTF_8));
             ctx.handleSimpleQuery(query, channel);
         } finally {
             query.release();
         }
-
-        readReadyForQueryMessage(channel);
-        assertThat(channel.outboundMessages().size() , is(0));
     }
 
     private static void sendStartupMessage(EmbeddedChannel channel) {
@@ -442,14 +458,6 @@ public class PostgresWireProtocolTest extends CrateDummyClusterServiceUnitTest {
         assertThat(responseBytes, is(new byte[]{'R', 0, 0, 0, 8, 0, 0, 0, 0}));
     }
 
-    private static void readReadyForQueryMessage(EmbeddedChannel channel) {
-        ByteBuf response = channel.readOutbound();
-        byte[] responseBytes = new byte[6];
-        response.readBytes(responseBytes);
-        // ReadyForQuery: 'Z' | int32 len | 'I'
-        assertThat(responseBytes, is(new byte[]{'Z', 0, 0, 0, 5, 'I'}));
-    }
-
     private static void skipParameterMessages(EmbeddedChannel channel) {
         int messagesToSkip = 0;
         for (Object msg : channel.outboundMessages()) {
@@ -462,5 +470,21 @@ public class PostgresWireProtocolTest extends CrateDummyClusterServiceUnitTest {
         for (int i = 0; i < messagesToSkip; i++) {
             channel.readOutbound();
         }
+    }
+
+    private static void readReadyForQueryMessage(EmbeddedChannel channel) {
+        ByteBuf response = channel.readOutbound();
+        byte[] responseBytes = new byte[6];
+        response.readBytes(responseBytes);
+        // ReadyForQuery: 'Z' | int32 len | 'I'
+        assertThat(responseBytes, is(new byte[]{'Z', 0, 0, 0, 5, 'I'}));
+    }
+
+    private static void readErrorResponse(EmbeddedChannel channel) {
+        ByteBuf response = channel.readOutbound();
+        byte[] responseBytes = new byte[5];
+        response.readBytes(responseBytes);
+        // ReadyForQuery: 'Z' | int32 len | 'I'
+        assertThat(responseBytes, is(new byte[]{'E', 0, 0, 0, 127}));
     }
 }
