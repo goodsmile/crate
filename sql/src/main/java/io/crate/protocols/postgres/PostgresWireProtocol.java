@@ -27,12 +27,12 @@ import io.crate.Version;
 import io.crate.action.sql.ResultReceiver;
 import io.crate.action.sql.SQLOperations;
 import io.crate.action.sql.Session;
-import io.crate.expression.symbol.Field;
-import io.crate.collections.Lists2;
 import io.crate.auth.Authentication;
 import io.crate.auth.AuthenticationMethod;
 import io.crate.auth.Protocol;
 import io.crate.auth.user.User;
+import io.crate.collections.Lists2;
+import io.crate.expression.symbol.Field;
 import io.crate.protocols.http.CrateNettyHttpServerTransport;
 import io.crate.protocols.postgres.types.PGType;
 import io.crate.protocols.postgres.types.PGTypes;
@@ -58,6 +58,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
 import static io.crate.protocols.SSL.getSession;
@@ -638,16 +639,36 @@ class PostgresWireProtocol {
 
     @VisibleForTesting
     void handleSimpleQuery(ByteBuf buffer, final Channel channel) {
-        String query = readCString(buffer);
-        assert query != null : "query must not be nulL";
+        String queryString = readCString(buffer);
+        assert queryString != null : "query must not be nulL";
+
+        List<String> queries = QueryStringSplitter.splitQuery(queryString);
+
+        // We use null or Boolean.FALSE to indicate whether a query was not interrupted
+        CompletableFuture<?> composedFuture = CompletableFuture.completedFuture(false);
+
+        for (String query : queries) {
+            composedFuture = composedFuture.thenCompose((result) -> {
+                if (result == null || result == Boolean.FALSE) {
+                    return handleSingleQuery(query, channel);
+                } else {
+                    //noinspection unchecked
+                    return (CompletableFuture) CompletableFuture.completedFuture(result);
+                }
+            });
+        }
+        composedFuture.whenComplete(new ReadyForQueryCallback(channel));
+    }
+
+    private CompletableFuture<?> handleSingleQuery(String query, Channel channel) {
 
         if (query.isEmpty() || ";".equals(query)) {
             Messages.sendEmptyQueryResponse(channel);
-            Messages.sendReadyForQuery(channel);
-            return;
+            return CompletableFuture.completedFuture(false);
         }
+
         try {
-            session.parse("", query, Collections.<DataType>emptyList());
+            session.parse("", query, Collections.emptyList());
             session.bind("", "", Collections.emptyList(), null);
             Session.DescribeResult describeResult = session.describe('P', "");
             List<Field> fields = describeResult.getFields();
@@ -665,12 +686,13 @@ class PostgresWireProtocol {
                 );
                 session.execute("", 0, resultSetReceiver);
             }
-            ReadyForQueryCallback readyForQueryCallback = new ReadyForQueryCallback(channel);
-            session.sync().whenComplete(readyForQueryCallback);
+            return session.sync();
         } catch (Throwable t) {
             session.clearState();
             Messages.sendErrorResponse(channel, t);
-            Messages.sendReadyForQuery(channel);
+            CompletableFuture<?> result = new CompletableFuture();
+            result.completeExceptionally(t);
+            return result;
         }
     }
 
